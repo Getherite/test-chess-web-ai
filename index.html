@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Échecs en ligne</title>
+  <link rel="stylesheet" href="https://unpkg.com/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #board { width: 320px; margin: auto; }
+    #controls { text-align: center; margin-top: 20px; }
+    input, button { font-size: 1.1em; padding: 6px; margin: 5px; }
+    #status { margin-top: 10px; font-weight: bold; text-align: center; }
+    @media (max-width: 480px) {
+      #board { width: 90vw; }
+    }
+  </style>
+</head>
+<body>
+
+<h1 style="text-align:center;">Échecs en ligne</h1>
+
+<div id="controls">
+  <button id="btnNewGame">Créer une nouvelle partie</button><br/>
+  <input id="gameIdInput" placeholder="ID de la partie" style="width:220px" />
+  <button id="btnJoinGame">Rejoindre la partie</button>
+</div>
+
+<div id="status">Crée ou rejoins une partie pour commencer</div>
+
+<div id="board"></div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://unpkg.com/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
+<script>
+  const API_URL = "http://127.0.0.1:8000";  // adapte l'URL si besoin
+  let board = null;
+  let chess = null;
+  let gameId = null;
+  let playerColor = 'white';
+  let polling = null;
+
+  function setStatus(text) {
+    $("#status").text(text);
+  }
+
+  // Initialise l'affichage du plateau
+  function initBoard() {
+    chess = new Chess();
+    board = Chessboard('board', {
+      draggable: true,
+      position: 'start',
+      orientation: playerColor,
+      onDrop: onDrop,
+      onSnapEnd: onSnapEnd
+    });
+  }
+
+  // Après déplacement visuel, synchroniser la position
+  function onSnapEnd() {
+    board.position(chess.fen());
+  }
+
+  // Quand un joueur tente de déplacer une pièce
+  function onDrop(source, target) {
+    const move = chess.move({from: source, to: target, promotion: 'q'}); // promotion par défaut reine
+
+    if (move === null) return 'snapback';  // coup invalide côté client
+
+    // Envoyer le coup au serveur
+    $.ajax({
+      url: `${API_URL}/move/${gameId}`,
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({move: move.from + move.to + (move.promotion ? move.promotion : '')}),
+      success: function(data) {
+        if(data.is_game_over) {
+          setStatus("Partie terminée !");
+          clearInterval(polling);
+        } else {
+          setStatus(`À ${chess.turn() === 'w' ? 'Blancs' : 'Noirs'} de jouer`);
+        }
+      },
+      error: function(xhr) {
+        alert("Coup illégal ou erreur serveur !");
+        chess.undo();
+        board.position(chess.fen());
+      }
+    });
+  }
+
+  // Récupérer l'état de la partie depuis le serveur et mettre à jour localement
+  function pollGameState() {
+    $.getJSON(`${API_URL}/state/${gameId}`, function(data) {
+      if(data.fen !== chess.fen()) {
+        chess.load(data.fen);
+        board.position(data.fen);
+      }
+
+      if(data.is_game_over) {
+        setStatus("Partie terminée !");
+        clearInterval(polling);
+        return;
+      }
+
+      const turn = data.turn === 'white' ? 'Blancs' : 'Noirs';
+      setStatus(`À ${turn} de jouer`);
+    }).fail(function() {
+      setStatus("Erreur lors de la récupération de l'état de la partie.");
+      clearInterval(polling);
+    });
+  }
+
+  // Créer une nouvelle partie
+  $("#btnNewGame").click(function() {
+    $.post(`${API_URL}/new`, function(data) {
+      gameId = data.game_id;
+      $("#gameIdInput").val(gameId);
+      playerColor = 'white';  // Celui qui crée joue blanc par défaut
+      initBoard();
+      setStatus("Partie créée ! À Blancs de jouer.");
+      if(polling) clearInterval(polling);
+      polling = setInterval(pollGameState, 2000);
+    });
+  });
+
+  // Rejoindre une partie existante
+  $("#btnJoinGame").click(function() {
+    const id = $("#gameIdInput").val().trim();
+    if(!id) {
+      alert("Entrez un ID de partie valide !");
+      return;
+    }
+    $.getJSON(`${API_URL}/state/${id}`, function(data) {
+      gameId = id;
+      chess = new Chess(data.fen);
+      board = Chessboard('board', {
+        draggable: true,
+        position: data.fen,
+        orientation: 'black', // Celui qui rejoint joue noir par défaut
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd
+      });
+      playerColor = 'black';
+      setStatus(`Partie rejointe ! À ${data.turn === 'white' ? 'Blancs' : 'Noirs'} de jouer.`);
+      if(polling) clearInterval(polling);
+      polling = setInterval(pollGameState, 2000);
+    }).fail(function() {
+      alert("Partie introuvable !");
+    });
+  });
+</script>
+</body>
+</html>
