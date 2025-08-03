@@ -1,42 +1,18 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Jeu d'échecs GitHub</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard.js/1.0.0/css/chessboard.min.css">
-  <style>
-    body { text-align: center; font-family: sans-serif; padding: 20px; }
-    #board { width: 90vw; max-width: 480px; margin: auto; }
-    button { margin-top: 20px; padding: 10px 20px; font-size: 16px; }
-  </style>
+  <title>Jeu d'Échecs</title>
+  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Jeu d'échecs</h1>
-  <div id="board"></div>
-  <button onclick="resetGame()">Nouvelle partie</button>
+  <h1>Jeu d'Échecs</h1>
+  <div id="board" style="width: 400px"></div>
+  <p id="status"></p>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard.js/1.0.0/js/chessboard.min.js"></script>
-  <script>
-    const game = new Chess();
-
-    const board = Chessboard('board', {
-      draggable: true,
-      position: 'start',
-      onDrop: (source, target, piece, newPos, oldPos, orientation) => {
-        const move = game.move({ from: source, to: target, promotion: 'q' });
-        if (move === null) return 'snapback';
-        board.position(game.fen());
-        if (game.game_over()) {
-          setTimeout(() => alert("Fin de la partie !"), 100);
-        }
-      }
-    });
-
-    function resetGame() {
-      game.reset();
-      board.start();
-    }
-  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
